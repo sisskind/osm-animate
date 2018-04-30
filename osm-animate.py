@@ -16,20 +16,23 @@ if not os.path.exists(place_name):
     os.makedirs(place_name)
 
 ## use snap.c to convert osm file to format suitable for datamaps
-os.system("cat " + osm_file + " | ./snap > " + place_name +"/datamapfile")
+os.system("cat " + osm_file + " | ./snap/snap > " + place_name +"/datamapfile")
 
 ## use beautiful soup to get timestamps from osm file and set frames (should ideally be done in C but I don't know how)
 
-soup = BeautifulSoup(open(osm_file))
+soup = BeautifulSoup(open(osm_file), "lxml")
 
 ways = soup.find_all('way')
 rows = []
 print "There are " + repr(len(ways))+ " ways."
 for way in ways:
-    rows.append([way['id'],way['timestamp'],0])
+    rows.append([way['id'],way['timestamp'],0,way['changeset']])
 
 rs = sorted(rows, key=lambda x: x[1])
 for row in rs:
+    changedelta = int(row[3]) - int(rs[0][3])
+    datedelta = parser.parse(rs[1][1]) + relativedelta.relativedelta(days=changedelta)
+    row[1] = str(datedelta)
     rd = relativedelta.relativedelta(parser.parse(row[1]),parser.parse(rs[0][1]))
     row[2] = rd.years * 12 + rd.months
 
@@ -82,12 +85,12 @@ frame_list = glob.glob(place_name + "/frame*")
 
 ## encode
 for index, file in enumerate(frame_list):
-    os.system("cat " + file + " | ./encode -o \"" + place_name + "/" + str(index+1) +"\" -z " + zoom_level)
+    os.system("cat " + file + " | ./datamaps/encode -o \"" + place_name + "/" + str(index+1) +"\" -z " + zoom_level)
 
 ## render
 for d in range(1,total_frames+1):
     print "Rendering frame " + str(d) + "..."
-    os.system("./render -t 0 -A -- \"" + place_name + "/" + str(d) + "\" " + zoom_level + " " + min_lat + " " + min_lon + " " + max_lat + " " + max_lon + " > " + place_name + "/" + str(d).zfill(4) +".png")
+    os.system("./datamaps/render -t 0 -A -- \"" + place_name + "/" + str(d) + "\" " + zoom_level + " " + min_lat + " " + min_lon + " " + max_lat + " " + max_lon + " > " + place_name + "/" + str(d).zfill(4) +".png")
 
 ## get png size
 image_output = subprocess.check_output(["identify", place_name + "/0001.png"])
@@ -106,7 +109,7 @@ os.system("convert -size " + ps_width + "x" + str(int(ps_height) + 50) + " canva
 
 ## animate
 print "Animating..."
-os.system("convert -coalesce -dispose 1 -delay 20 -loop 0 " + place_name + "/frame*.png " + place_name + "/" + place_name + ".gif")
+os.system("convert -coalesce -dispose 1 -delay 5 -loop 0 " + place_name + "/frame*.png " + place_name + "/" + place_name + ".gif")
 
 ## redo the gif with pause at the end
 print "GIFing..."
