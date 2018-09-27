@@ -28,23 +28,34 @@ print "There are " + repr(len(ways))+ " ways."
 for way in ways:
     rows.append([way['id'],way['timestamp'],0,way['changeset']])
 
-rs = sorted(rows, key=lambda x: x[1])
+rs = sorted(rows, key=lambda x: x[3])
+initChangeset = min(rs, key = lambda x: x[3])[3]
+
 for row in rs:
-    changedelta = int(row[3]) - int(rs[0][3])
-    datedelta = parser.parse(rs[1][1]) + relativedelta.relativedelta(days=changedelta)
+    ## Subtract changeset id from first and add that to date.  This is because all dates are the same
+    changedelta = int(row[3]) - int(initChangeset)
+    datedelta = parser.parse(row[1]) + relativedelta.relativedelta(days=changedelta)
+    rd = relativedelta.relativedelta(datedelta, parser.parse(row[1]))
     row[1] = str(datedelta)
-    rd = relativedelta.relativedelta(parser.parse(row[1]),parser.parse(rs[0][1]))
     row[2] = rd.years * 12 + rd.months
+
+    # rd = relativedelta.relativedelta(parser.parse(row[1]),parser.parse(rs[0][1]))
+    # row[2] = rd.years * 12 + rd.months    
+
 
 total_frames = max(rs, key = lambda x: x[2])[2]
 print "There are " + str(total_frames) + " frames to render."
 
 ## there has to be a better way to do this next part but I wrote it on a plane with no access to stack-overflow
-date_list = []
+# date_list = []
+# for i in range(total_frames+1):
+#     list_year = (parser.parse(rs[1][1]) + relativedelta.relativedelta(months=i)).year
+#     list_month = (parser.parse(rs[1][1]) + relativedelta.relativedelta(months=i)).month
+#     date_list.append(str(list_year) + "-" + str(list_month).zfill(2))
+
+changeset_list = []
 for i in range(total_frames+1):
-    list_year = (parser.parse(rs[1][1]) + relativedelta.relativedelta(months=i)).year
-    list_month = (parser.parse(rs[1][1]) + relativedelta.relativedelta(months=i)).month
-    date_list.append(str(list_year) + "-" + str(list_month).zfill(2))
+    changeset_list.append(str(rs[i][3]))
 
 ## set zoom and bounding box according to defaults or passed arguments
 if len(sys.argv) < 4:
@@ -67,7 +78,7 @@ else:
 with open(place_name + "/datamapfile") as f:
     lines = f.readlines()
     for i in range(0,total_frames):
-        print "Creating frame " + str(repr(i+1)) + "..."
+        # print "Creating frame " + str(repr(i+1)) + "..."
         output = []
         ## create temp array of ids that match this frame
         flt = filter(lambda x: x[2] == i,rs)
@@ -89,8 +100,8 @@ for index, file in enumerate(frame_list):
 
 ## render
 for d in range(1,total_frames+1):
-    print "Rendering frame " + str(d) + "..."
-    os.system("./datamaps/render -t 0 -A -- \"" + place_name + "/" + str(d) + "\" " + zoom_level + " " + min_lat + " " + min_lon + " " + max_lat + " " + max_lon + " > " + place_name + "/" + str(d).zfill(4) +".png")
+    print "Rendering frame " + str(d) + "/" + str(total_frames) + "..."
+    os.system("./datamaps/render -c ff0000 -S ff0000 -L 0.5 -t 0 -A -- \"" + place_name + "/" + str(d) + "\" " + zoom_level + " " + min_lat + " " + min_lon + " " + max_lat + " " + max_lon + " > " + place_name + "/" + str(d).zfill(4) +".png")
 
 ## get png size
 image_output = subprocess.check_output(["identify", place_name + "/0001.png"])
@@ -101,7 +112,7 @@ ps_height = re.search("PNG \d+x(\d+)",image_output).group(1)
 for i in range(1,total_frames+1):
     fr = str(i).zfill(4)
     print "Creating label " + str(fr) + "..."
-    os.system("convert -size " + ps_width + "x50 -gravity -font Helvetica-Narrow center -background black -stroke white -fill white label:'" + place_name + " " + date_list[i] + "' " + place_name + "/" + fr + "_label.png")
+    os.system("convert -size " + ps_width + "x50 -background black -stroke white -fill white label:'" + place_name + "' " + place_name + "/" + fr + "_label.png")
     os.system("convert -append " + place_name + "/" + fr +".png " + place_name + "/" + fr + "_label.png " + place_name + "/frame" + fr + ".png")
 
 ## create a starter black frame
